@@ -1,0 +1,205 @@
+name: IaC Security Scanning with Datadog Tag Compliance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  terraform-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+        
+    - name: Terraform Format Check
+      run: terraform fmt -check -recursive
+      working-directory: ./terraform
+      
+    - name: Terraform Init
+      run: terraform init -backend=false
+      working-directory: ./terraform
+      
+    - name: Terraform Validate
+      run: terraform validate
+      working-directory: ./terraform
+
+  checkov-scan:
+    name: Checkov IaC Security Scan
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install Checkov
+      run: |
+        pip install checkov
+        
+    - name: Run Checkov Scan with Custom Datadog Policies
+      run: |
+        echo "🔍 Running IaC scan with Datadog tagging compliance checks..."
+        
+        # Run with custom policies and generate both CLI and SARIF output
+        checkov \
+          --framework terraform \
+          --directory ./terraform \
+          --external-checks-dir ./policies \
+          --output cli \
+          --output sarif \
+          --output-file-path console,checkov-results.sarif \
+          --soft-fail \
+          --quiet
+          
+        echo "✅ Checkov scan completed. Results saved to checkov-results.sarif"
+        
+    - name: Display Datadog Tag Compliance Summary
+      run: |
+        echo "📊 DATADOG TAGGING COMPLIANCE SUMMARY"
+        echo "======================================"
+        
+        # Count violations by looking for our custom check IDs
+        python3 -c "
+import json
+import sys
+
+try:
+    with open('checkov-results.sarif', 'r') as f:
+        sarif = json.load(f)
+    
+    total_violations = 0
+    datadog_violations = 0
+    
+    for run in sarif.get('runs', []):
+        for result in run.get('results', []):
+            rule_id = result.get('ruleId', '')
+            if rule_id.startswith('CKV_DD'):
+                datadog_violations += 1
+            total_violations += 1
+    
+    print(f'🚨 Total IaC violations found: {total_violations}')
+    print(f'📋 Datadog tag violations: {datadog_violations}')
+    
+    if datadog_violations > 0:
+        print('\\n⚠️  DATADOG TAG COMPLIANCE ISSUES DETECTED!')
+        print('Resources missing required tags: env, service, version, team')
+        print('This will impact Datadog observability and monitoring capabilities.')
+        print('Please fix tagging issues before deployment.')
+    else:
+        print('\\n✅ All resources are compliant with Datadog tagging requirements!')
+        
+except FileNotFoundError:
+    print('No SARIF results file found')
+except Exception as e:
+    print(f'Error reading results: {e}')
+"
+    
+    - name: Upload Checkov Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: checkov-results
+        path: checkov-results.sarif
+        
+    - name: Comment PR with Results (if PR)
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const sarif = JSON.parse(fs.readFileSync('checkov-results.sarif', 'utf8'));
+            
+            let violations = 0;
+            let datadogViolations = 0;
+            let details = [];
+            
+            for (const run of sarif.runs || []) {
+              for (const result of run.results || []) {
+                violations++;
+                if (result.ruleId && result.ruleId.startsWith('CKV_DD')) {
+                  datadogViolations++;
+                  const location = result.locations?.[0]?.physicalLocation?.artifactLocation?.uri || 'Unknown';
+                  details.push(`- **${result.ruleId}**: ${result.message?.text || result.ruleId} in \`${location}\``);
+                }
+              }
+            }
+            
+            const comment = `
+## 🔍 IaC Security Scan Results
+            
+**Total violations:** ${violations}  
+**Datadog tag violations:** ${datadogViolations}
+
+${datadogViolations > 0 ? `
+### 🚨 Datadog Tagging Issues
+The following resources are missing required Datadog tags (\`env\`, \`service\`, \`version\`, \`team\`):
+
+${details.slice(0, 10).join('\\n')}
+${details.length > 10 ? `\\n...and ${details.length - 10} more` : ''}
+
+⚠️ **Impact**: Missing tags will affect Datadog observability, Watchdog alerts, APM service mapping, and UI navigation.
+
+📋 **Action Required**: Please add the required Datadog tags to ensure full observability coverage.
+` : `
+### ✅ Datadog Tagging Compliance
+All resources have the required Datadog tags for optimal observability!
+`}
+
+<details>
+<summary>View Full Scan Results</summary>
+
+[Download detailed results](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+
+</details>
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          } catch (error) {
+            console.log('Error creating comment:', error);
+          }
+
+  # This job demonstrates how to fail the pipeline for critical violations
+  # Uncomment to enable hard stops for production environments
+  # enforce-compliance:
+  #   name: Enforce Tag Compliance (Hard Stop)
+  #   runs-on: ubuntu-latest
+  #   needs: checkov-scan
+  #   if: github.ref == 'refs/heads/main'  # Only enforce on main branch
+  #   
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #     
+  #   - name: Install Checkov
+  #     run: pip install checkov
+  #     
+  #   - name: Run Checkov with Hard Fail
+  #     run: |
+  #       checkov \
+  #         --framework terraform \
+  #         --directory ./terraform \
+  #         --external-checks-dir ./policies \
+  #         --check CKV_DD_TAGS_001 \
+  #         --hard-fail-on CKV_DD_TAGS_001

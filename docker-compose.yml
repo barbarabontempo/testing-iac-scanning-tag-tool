@@ -1,0 +1,46 @@
+# Docker Compose for Datadog IaC Tagging Compliance Demo
+version: '3.8'
+
+services:
+  datadog-iac-scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datadog-tag-compliance
+    volumes:
+      # Mount local terraform directory for live editing during demos
+      - ./terraform:/app/terraform:ro
+      # Mount policies for customization
+      - ./policies:/app/policies:ro
+      # Mount output directory for results
+      - ./results:/app/results
+    environment:
+      - PYTHONPATH=/app
+      - CHECKOV_LOG_LEVEL=INFO
+    working_dir: /app
+    
+    # Override default command for different demo scenarios
+    # Uncomment one of these or use docker-compose run with custom commands
+    
+    # Default: Run compliance check
+    # command: ["./scripts/datadog-tag-check.sh"]
+    
+    # Alternative: Interactive shell for live demo
+    # command: ["bash"]
+    
+    # Alternative: Specific Checkov scan with JSON output
+    # command: ["checkov", "--framework", "terraform", "--directory", "./terraform", "--external-checks-dir", "./policies", "--output", "json", "--output-file-path", "/app/results/scan-results.json", "--soft-fail"]
+
+  # Optional: Terraform container for validation
+  terraform-validator:
+    image: hashicorp/terraform:1.5
+    container_name: terraform-validator
+    volumes:
+      - ./terraform:/workspace:ro
+    working_dir: /workspace
+    command: ["terraform", "validate"]
+    profiles: ["validate"]
+
+volumes:
+  results:
+    driver: local

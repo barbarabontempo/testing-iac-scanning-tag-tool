@@ -1,0 +1,100 @@
+# Checkov YAML-based custom policies for Datadog tagging compliance
+# This file defines YAML-based policies for Datadog observability tagging requirements
+
+metadata:
+  name: "Datadog Tagging Policy"
+  id: "DATADOG_TAGS"
+  category: "GENERAL_SECURITY"
+  
+definition:
+  cond_type: "and"
+  conditions:
+  # Policy to check for 'env' tag presence
+  - cond_type: "attribute"
+    resource_types: 
+      - "aws_instance"
+      - "aws_s3_bucket"
+      - "aws_rds_instance"
+      - "aws_security_group"
+      - "aws_lambda_function"
+      - "aws_ecs_service"
+      - "aws_eks_cluster"
+      - "aws_dynamodb_table"
+    attribute: "tags.env"
+    operator: "exists"
+    description: "Ensure all AWS resources have 'env' tag for Datadog environment filtering"
+    custom_id: "CKV_DD_YAML_001"
+    
+  # Policy to check 'env' tag values
+  - cond_type: "attribute"
+    resource_types:
+      - "aws_instance" 
+      - "aws_s3_bucket"
+      - "aws_rds_instance"
+      - "aws_security_group"
+      - "aws_lambda_function"
+      - "aws_ecs_service"
+      - "aws_eks_cluster"
+      - "aws_dynamodb_table"
+    attribute: "tags.env"
+    operator: "within"
+    value:
+      - "prod"
+      - "production"
+      - "staging"
+      - "stage" 
+      - "dev"
+      - "development"
+      - "test"
+      - "qa"
+    description: "Ensure 'env' tag has valid environment value for Datadog"
+    custom_id: "CKV_DD_YAML_002"
+    
+  # Policy to check 'service' tag presence
+  - cond_type: "attribute"
+    resource_types:
+      - "aws_instance"
+      - "aws_s3_bucket" 
+      - "aws_rds_instance"
+      - "aws_security_group"
+      - "aws_lambda_function"
+      - "aws_ecs_service"
+      - "aws_eks_cluster"
+      - "aws_dynamodb_table"
+    attribute: "tags.service"
+    operator: "exists"
+    description: "Ensure all AWS resources have 'service' tag for Datadog service mapping"
+    custom_id: "CKV_DD_YAML_003"
+    
+  # Policy to check 'version' tag presence  
+  - cond_type: "attribute"
+    resource_types:
+      - "aws_instance"
+      - "aws_s3_bucket"
+      - "aws_rds_instance" 
+      - "aws_security_group"
+      - "aws_lambda_function"
+      - "aws_ecs_service"
+      - "aws_eks_cluster"
+      - "aws_dynamodb_table"
+    attribute: "tags.version"
+    operator: "exists"
+    description: "Ensure all AWS resources have 'version' tag for Datadog deployment tracking"
+    custom_id: "CKV_DD_YAML_004"
+    
+  # Policy to check 'team' tag presence
+  - cond_type: "attribute"
+    resource_types:
+      - "aws_instance"
+      - "aws_s3_bucket"
+      - "aws_rds_instance" 
+      - "aws_security_group"
+      - "aws_lambda_function"
+      - "aws_ecs_service"
+      - "aws_eks_cluster"
+      - "aws_dynamodb_table"
+    attribute: "tags.team"
+    operator: "exists"
+    description: "Ensure all AWS resources have 'team' tag for Datadog ownership tracking"
+    custom_id: "CKV_DD_YAML_005"
+

@@ -1,0 +1,79 @@
+# Pre-commit hooks for IaC scanning and Datadog tag compliance
+# Run: pre-commit install to set up hooks
+# Run: pre-commit run --all-files to test
+
+repos:
+  # Terraform hooks
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.83.5
+    hooks:
+      - id: terraform_fmt
+        name: Terraform Format
+        description: Format Terraform files
+      - id: terraform_validate
+        name: Terraform Validate  
+        description: Validate Terraform syntax
+        args:
+          - --args=-json
+      - id: terraform_docs
+        name: Terraform Documentation
+        description: Generate Terraform documentation
+        args:
+          - --args=--config=.terraform-docs.yml
+
+  # Checkov IaC security scanning
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: 3.0.20
+    hooks:
+      - id: checkov
+        name: Checkov IaC Security Scan
+        description: Run Checkov IaC security scan with Datadog tag compliance
+        args: 
+          - --framework=terraform
+          - --external-checks-dir=./policies
+          - --soft-fail  # Change to --hard-fail-on=CKV_DD_TAGS_001 for hard stops
+          - --quiet
+          - --compact
+        files: \.tf$
+        exclude: ^\.terraform/
+        verbose: true
+
+  # YAML formatting and validation
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        name: YAML Lint
+        description: Lint YAML files including policies
+        args: [-c=.yamllint.yml]
+        files: \.(yaml|yml)$
+
+  # Python hooks for custom policies
+  - repo: https://github.com/psf/black
+    rev: 23.9.1
+    hooks:
+      - id: black
+        name: Black Python Formatter
+        description: Format Python policy files
+        files: ^policies/.*\.py$
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        name: Python Linting
+        description: Lint Python policy files
+        files: ^policies/.*\.py$
+        args: [--max-line-length=120]
+
+  # Custom hook for Datadog tag compliance summary
+  - repo: local
+    hooks:
+      - id: datadog-tag-summary
+        name: Datadog Tag Compliance Summary
+        description: Display summary of Datadog tagging compliance
+        entry: ./scripts/datadog-tag-check.sh
+        language: script
+        files: \.tf$
+        pass_filenames: false
+        always_run: true

@@ -74,40 +74,40 @@ jobs:
         echo "======================================"
         
         # Count violations by looking for our custom check IDs
-        python3 -c "
-import json
-import sys
+        python3 << 'EOF'
+        import json
+        import sys
 
-try:
-    with open('checkov-results.sarif', 'r') as f:
-        sarif = json.load(f)
-    
-    total_violations = 0
-    datadog_violations = 0
-    
-    for run in sarif.get('runs', []):
-        for result in run.get('results', []):
-            rule_id = result.get('ruleId', '')
-            if rule_id.startswith('CKV_DD'):
-                datadog_violations += 1
-            total_violations += 1
-    
-    print(f'🚨 Total IaC violations found: {total_violations}')
-    print(f'📋 Datadog tag violations: {datadog_violations}')
-    
-    if datadog_violations > 0:
-        print('\\n⚠️  DATADOG TAG COMPLIANCE ISSUES DETECTED!')
-        print('Resources missing required tags: env, service, version, team')
-        print('This will impact Datadog observability and monitoring capabilities.')
-        print('Please fix tagging issues before deployment.')
-    else:
-        print('\\n✅ All resources are compliant with Datadog tagging requirements!')
-        
-except FileNotFoundError:
-    print('No SARIF results file found')
-except Exception as e:
-    print(f'Error reading results: {e}')
-"
+        try:
+            with open('checkov-results.sarif', 'r') as f:
+                sarif = json.load(f)
+            
+            total_violations = 0
+            datadog_violations = 0
+            
+            for run in sarif.get('runs', []):
+                for result in run.get('results', []):
+                    rule_id = result.get('ruleId', '')
+                    if rule_id.startswith('CKV_DD'):
+                        datadog_violations += 1
+                    total_violations += 1
+            
+            print(f'🚨 Total IaC violations found: {total_violations}')
+            print(f'📋 Datadog tag violations: {datadog_violations}')
+            
+            if datadog_violations > 0:
+                print('\n⚠️  DATADOG TAG COMPLIANCE ISSUES DETECTED!')
+                print('Resources missing required tags: env, service, version, team')
+                print('This will impact Datadog observability and monitoring capabilities.')
+                print('Please fix tagging issues before deployment.')
+            else:
+                print('\n✅ All resources are compliant with Datadog tagging requirements!')
+                
+        except FileNotFoundError:
+            print('No SARIF results file found')
+        except Exception as e:
+            print(f'Error reading results: {e}')
+        EOF
     
     - name: Upload Checkov Results
       uses: actions/upload-artifact@v3
@@ -141,34 +141,34 @@ except Exception as e:
               }
             }
             
-            const comment = `
+            const comment = \`
 ## 🔍 IaC Security Scan Results
             
-**Total violations:** ${violations}  
-**Datadog tag violations:** ${datadogViolations}
+**Total violations:** \${violations}  
+**Datadog tag violations:** \${datadogViolations}
 
-${datadogViolations > 0 ? `
+\${datadogViolations > 0 ? \`
 ### 🚨 Datadog Tagging Issues
-The following resources are missing required Datadog tags (\`env\`, \`service\`, \`version\`, \`team\`):
+The following resources are missing required Datadog tags (\\\`env\\\`, \\\`service\\\`, \\\`version\\\`, \\\`team\\\`):
 
-${details.slice(0, 10).join('\\n')}
-${details.length > 10 ? `\\n...and ${details.length - 10} more` : ''}
+\${details.slice(0, 10).join('\\n')}
+\${details.length > 10 ? \`\\n...and \${details.length - 10} more\` : ''}
 
 ⚠️ **Impact**: Missing tags will affect Datadog observability, Watchdog alerts, APM service mapping, and UI navigation.
 
 📋 **Action Required**: Please add the required Datadog tags to ensure full observability coverage.
-` : `
+\` : \`
 ### ✅ Datadog Tagging Compliance
 All resources have the required Datadog tags for optimal observability!
-`}
+\`}
 
 <details>
 <summary>View Full Scan Results</summary>
 
-[Download detailed results](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+[Download detailed results](https://github.com/\${context.repo.owner}/\${context.repo.repo}/actions/runs/\${context.runId})
 
 </details>
-            `;
+            \`;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,

@@ -19,20 +19,15 @@ provider "aws" {
   region = var.aws_region
 }
 
-# ✅ DATADOG COMPLIANT RESOURCE: Has all required Datadog tags
+# 🚨 DEMO: BREAKING DATADOG COMPLIANCE - Missing required tags!
 resource "aws_instance" "web_server_compliant" {
   ami           = var.ami_id
   instance_type = "t3.micro"
   
   tags = {
     Name        = "web-server-prod"
-    # Required Datadog tags for observability
-    env         = "prod"
-    service     = "web-server"
-    version     = "1.2.3"
-    team        = "platform-team"
-    
-    # Optional but helpful tags
+    # REMOVED Datadog tags to demonstrate violations!
+    # Missing: env, service, version, team
     component   = "frontend"
     monitoring  = "datadog"
   }
@@ -49,22 +44,21 @@ resource "aws_instance" "web_server_non_compliant" {
   }
 }
 
-# ✅ DATADOG COMPLIANT RESOURCE: S3 bucket with proper Datadog tagging
+# 🚨 DEMO: INVALID DATADOG TAG FORMATS - Will trigger violations!
 resource "aws_s3_bucket" "data_bucket_compliant" {
   bucket = "company-data-${random_id.bucket_suffix.hex}"
   
   tags = {
     Name        = "company-data-bucket"
-    # Required Datadog tags
-    env         = "prod"
-    service     = "data-analytics"
-    version     = "2.1.0"
-    team        = "data-team"
+    # INVALID Datadog tag formats for demo:
+    env         = "PRODUCTION"  # Should be lowercase
+    service     = "Data_Analytics_Service"  # Should be lowercase with hyphens
+    version     = "latest-v2.1.0-SNAPSHOT"  # Invalid format
+    team        = "Data Team Lead"  # Should not have spaces
     
     # Data-specific tags
     data_class  = "confidential"
     backup      = "enabled"
-    retention   = "7-years"
   }
 }
 
